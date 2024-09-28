@@ -24,6 +24,8 @@ from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
 
+from presets.tags import tags
+
 def get_task(*args):
     args = list(args)
     args.pop(0)
@@ -145,7 +147,7 @@ def inpaint_mode_change(mode, inpaint_engine_version):
 
 reload_javascript()
 
-title = f'Fooocus {fooocus_version.version}'
+title = f'Tagging Playground {fooocus_version.version}'
 
 if isinstance(args_manager.args.preset, str):
     title += ' ' + args_manager.args.preset
@@ -168,9 +170,8 @@ with shared.gradio_root:
                                  elem_classes=['resizable_area', 'main_view', 'final_gallery', 'image_gallery'],
                                  elem_id='final_gallery')
             with gr.Row():
-                with gr.Column(scale=17):
-                    prompt = gr.Textbox(show_label=False, placeholder="Type prompt here or paste parameters.", elem_id='positive_prompt',
-                                        autofocus=True, lines=3)
+                with gr.Column(scale=20):
+                    prompt = gr.Dropdown(tags, value=["1girl", "realistic"], elem_id='positive_prompt', multiselect=True, show_label=False)
 
                     default_prompt = modules.config.default_prompt
                     if isinstance(default_prompt, str) and default_prompt != '':
@@ -200,10 +201,10 @@ with shared.gradio_root:
                     stop_button.click(stop_clicked, inputs=currentTask, outputs=currentTask, queue=False, show_progress=False, _js='cancelGenerateForever')
                     skip_button.click(skip_clicked, inputs=currentTask, outputs=currentTask, queue=False, show_progress=False)
             with gr.Row(elem_classes='advanced_check_row'):
-                input_image_checkbox = gr.Checkbox(label='Input Image', value=modules.config.default_image_prompt_checkbox, container=False, elem_classes='min_check')
-                enhance_checkbox = gr.Checkbox(label='Enhance', value=modules.config.default_enhance_checkbox, container=False, elem_classes='min_check')
-                advanced_checkbox = gr.Checkbox(label='Advanced', value=modules.config.default_advanced_checkbox, container=False, elem_classes='min_check')
-            with gr.Row(visible=modules.config.default_image_prompt_checkbox) as image_input_panel:
+                input_image_checkbox = gr.Checkbox(label='Input Image', value=modules.config.default_image_prompt_checkbox, visible=False, container=False, elem_classes='min_check')
+                enhance_checkbox = gr.Checkbox(label='Enhance', value=modules.config.default_enhance_checkbox, container=False, visible=False, elem_classes='min_check')
+                advanced_checkbox = gr.Checkbox(label='Advanced', value=modules.config.default_advanced_checkbox, container=True, visible=False, elem_classes='min_check')
+            with gr.Row(visible=False) as image_input_panel:
                 with gr.Tabs(selected=modules.config.default_selected_image_input_tab_id):
                     with gr.Tab(label='Upscale or Variation', id='uov_tab') as uov_tab:
                         with gr.Row():
@@ -380,7 +381,7 @@ with shared.gradio_root:
                         metadata_input_image.upload(trigger_metadata_preview, inputs=metadata_input_image,
                                                     outputs=metadata_json, queue=False, show_progress=True)
 
-            with gr.Row(visible=modules.config.default_enhance_checkbox) as enhance_input_panel:
+            with gr.Row(visible=False) as enhance_input_panel:
                 with gr.Tabs():
                     with gr.Tab(label='Upscale or Variation'):
                         with gr.Row():
@@ -555,20 +556,18 @@ with shared.gradio_root:
             enhance_checkbox.change(lambda x: gr.update(visible=x), inputs=enhance_checkbox,
                                         outputs=enhance_input_panel, queue=False, show_progress=False, _js=switch_js)
 
-        with gr.Column(scale=1, visible=modules.config.default_advanced_checkbox) as advanced_column:
+        with gr.Column(scale=1, visible=True) as advanced_column:
             with gr.Tab(label='Settings'):
                 if not args_manager.args.disable_preset_selection:
                     preset_selection = gr.Dropdown(label='Preset',
-                                                   choices=modules.config.available_presets,
-                                                   value=args_manager.args.preset if args_manager.args.preset else "initial",
-                                                   interactive=True)
+                                                   visible=False)
 
                 performance_selection = gr.Radio(label='Performance',
                                                  choices=flags.Performance.values(),
                                                  value=modules.config.default_performance,
                                                  elem_classes=['performance_selection'])
 
-                with gr.Accordion(label='Aspect Ratios', open=False, elem_id='aspect_ratios_accordion') as aspect_ratios_accordion:
+                with gr.Accordion(label='Aspect Ratios', open=True, elem_id='aspect_ratios_accordion') as aspect_ratios_accordion:
                     aspect_ratios_selection = gr.Radio(label='Aspect Ratios', show_label=False,
                                                        choices=modules.config.available_aspect_ratios_labels,
                                                        value=modules.config.default_aspect_ratio,
@@ -668,7 +667,7 @@ with shared.gradio_root:
                     refiner_model.change(lambda x: gr.update(visible=x != 'None'),
                                          inputs=refiner_model, outputs=refiner_switch, show_progress=False, queue=False)
 
-                with gr.Group():
+                with gr.Group(visible=False):
                     lora_ctrls = []
 
                     for i, (enabled, filename, weight) in enumerate(modules.config.default_loras):
@@ -686,7 +685,7 @@ with shared.gradio_root:
                 with gr.Row():
                     refresh_files = gr.Button(label='Refresh', value='\U0001f504 Refresh All Files', variant='secondary', elem_classes='refresh_button')
             with gr.Tab(label='Advanced'):
-                guidance_scale = gr.Slider(label='Guidance Scale', minimum=1.0, maximum=30.0, step=0.01,
+                guidance_scale = gr.Slider(label='Guidance Scale', minimum=4.0, maximum=7.0, step=0.01,
                                            value=modules.config.default_cfg_scale,
                                            info='Higher value means style is cleaner, vivider, and more artistic.')
                 sharpness = gr.Slider(label='Image Sharpness', minimum=0.0, maximum=30.0, step=0.001,
@@ -1068,7 +1067,11 @@ with shared.gradio_root:
             if flags.describe_type_photo in modes:
                 from extras.interrogate import default_interrogator as default_interrogator_photo
                 describe_prompts.append(default_interrogator_photo(img))
-                styles.update(["Fooocus V2", "Fooocus Enhance", "Fooocus Sharp"])
+                styles.update(["Fooocus V2",
+                               "Fooocus Enhance",
+                               "Fooocus Negative",
+                               "Photo Iphone Photographic",
+                               "SAI Photographic"])
 
             if flags.describe_type_anime in modes:
                 from extras.wd14tagger import default_interrogator as default_interrogator_anime
